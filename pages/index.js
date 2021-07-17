@@ -25,14 +25,40 @@ function ProfileSidebar(propriedades) {
   );
 }
 
+function ProfileRelationsBox(propriedades) {
+  return (
+    <ProfileRelationsBoxWrapper>
+      <h2 className="smallTitle">
+        {propriedades.title} ({propriedades.items.length})
+      </h2>
+
+      <ul>
+        {propriedades.items.slice(0, 6).map((itemAtual) => {
+          return (
+            <li key={itemAtual.id}>
+              <a href={`https://github.com/${itemAtual.login}.png`}>
+                <img src={`https://github.com/${itemAtual.login}.png`} />
+                <span>{itemAtual.login}</span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+
+    </ProfileRelationsBoxWrapper>
+  );
+}
+
 export default function Home() {
   const githubUser = 'rodrifontes';
   //React.useState(['AluraKu']) retorna duas coisas, a primeira o valor do array e a segunda uma função 
-  const [comunidades, setComunidades] = React.useState([{
+  const [comunidades, setComunidades] = React.useState([
+    /* {
     id: new Date().toISOString(),
     title: 'Eu odeio acordar cedo',
     image: 'https://alurakut.vercel.app/capa-comunidade-01.jpg'
-  }]);
+  } */
+  ]);
   const pessoasFavoritas = [
     'juunegreiros',
     'omariosouto',
@@ -42,6 +68,49 @@ export default function Home() {
     'felipefialho',
     //'guilhermesilveira'
   ];
+
+  const [seguidores, setSeguidores] = React.useState([]);
+  //Interceptador de qualquer evento que venha a acontecer
+  //O segundo par é um array de quando eu quero q ele execute, quando eu deixar vazio ele vai executar só 1 vez
+  //poderia botar uma variavel que quando ela fosse alterada ele executasse
+  React.useEffect(function () {
+    // 1 - Pegar o array de dados do github
+    fetch('https://api.github.com/users/omariosouto/followers')
+      //GET  
+      .then((respostaDoServidor) => {
+        if (respostaDoServidor.ok) {
+          return respostaDoServidor.json();
+        }
+        throw new Error('Aconteceu algum problema: ' + respostaDoServidor.status)
+      })
+      .then((respostaConvertida) => {
+        setSeguidores(respostaConvertida);
+      })
+    //API GraphQL
+    fetch('https://graphql.datocms.com/', {
+      //Por padrão é GET por isso que no outro fetch não especifiquei
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': '2008473fec078db3a393ebd463e07d'
+      },
+      body: JSON.stringify({
+        "query": `query {
+          allCommunities {
+            id,
+            title,
+            imageUrl,
+            creatorSlug
+          }
+        }`}),
+    })
+      .then((response) => response.json()) //Pega o retorno do response.json e já retorna
+      .then((respostaCompleta => {
+        setComunidades(respostaCompleta.data.allCommunities);
+      }))
+  }, []);
+  // 2 - Criar um box que vai ter um map, baseado nos itens do array do github 
 
   return (
     <>
@@ -57,7 +126,7 @@ export default function Home() {
         <div className="welcomeArea" style={{ gridArea: 'welcomeArea' }}>
           <Box>
             <h1 className="title">
-              Bem vindo(a)
+              Bem vindo(a), {githubUser}
             </h1>
 
             <OrkutNostalgicIconSet />
@@ -72,12 +141,29 @@ export default function Home() {
               const dadosDoForm = new FormData(e.target);
 
               const comunidade = {
-                id: new Date().toISOString(),
                 title: dadosDoForm.get('title'),
-                image: dadosDoForm.get('image')
+                imageUrl: dadosDoForm.get('image'),
+                creatorSlug: githubUser,
               }
-              const comunidadesAtualizadas = [...comunidades, comunidade];
-              setComunidades(comunidadesAtualizadas);
+
+              fetch('/api/comunidades', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+
+                },
+                body: JSON.stringify(comunidade)
+
+
+              })
+                .then(async (response) => {
+                  const dados = await response.json();
+                  console.log(dados.registroCriado);
+                  const comunidade = dados.registroCriado;
+                  const comunidadesAtualizadas = [...comunidades, comunidade];
+                  setComunidades(comunidadesAtualizadas)
+                })
+
             }}>
               <div>
                 <input
@@ -103,17 +189,20 @@ export default function Home() {
         </div>
 
         <div className="profileRelationsArea" style={{ gridArea: 'profileRelationsArea' }}>
+
+          <ProfileRelationsBox title="Amigos" items={seguidores} />
+
           <ProfileRelationsBoxWrapper>
             <h2 className="smallTitle">
               Comunidades ({comunidades.length})
             </h2>
 
             <ul>
-              {comunidades.map((itemAtual) => {
+              {comunidades.slice(0, 6).map((itemAtual) => {
                 return (
                   <li key={itemAtual.id}>
-                    <a href={`/users/${itemAtual.title}`}>
-                      <img src={itemAtual.image} />
+                    <a href={`/communities/${itemAtual.id}`}>
+                      <img src={itemAtual.imageUrl} />
                       <span>{itemAtual.title}</span>
                     </a>
                   </li>
@@ -128,7 +217,7 @@ export default function Home() {
             </h2>
 
             <ul>
-              {pessoasFavoritas.map((itemAtual) => {
+              {pessoasFavoritas.slice(0, 6).map((itemAtual) => {
                 return (
                   <li key={itemAtual}>
                     <a href={`/users/${itemAtual}`}>
